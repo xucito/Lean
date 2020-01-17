@@ -75,7 +75,6 @@ namespace QuantConnect.Algorithm.CSharp
         {
             {"Total Trades", "5"},
             {"Average Win", "0%"},
-<<<<<<< refs/remotes/origin/master
             {"Average Loss", "-0.66%"},
             {"Compounding Annual Return", "232.602%"},
             {"Drawdown", "2.300%"},
@@ -113,26 +112,6 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "54.5455%"},
             {"Rolling Averaged Population Direction", "59.8056%"},
             {"Rolling Averaged Population Magnitude", "59.8056%"}
-=======
-            {"Average Loss", "-0.67%"},
-            {"Compounding Annual Return", "200.831%"},
-            {"Drawdown", "2.300%"},
-            {"Expectancy", "-1"},
-            {"Net Profit", "1.520%"},
-            {"Sharpe Ratio", "3.669"},
-            {"Loss Rate", "100%"},
-            {"Win Rate", "0%"},
-            {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.528"},
-            {"Beta", "0.333"},
-            {"Annual Standard Deviation", "0.176"},
-            {"Annual Variance", "0.031"},
-            {"Information Ratio", "1.402"},
-            {"Tracking Error", "0.207"},
-            {"Treynor Ratio", "1.943"},
-            {"Total Fees", "$16.27"},
-            {"Long/Short Ratio", "100%"}
->>>>>>> Update regression algorithms statistics
         };
     }
 }
