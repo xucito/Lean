@@ -33,7 +33,7 @@ namespace QuantConnect.Messaging
     {
         // used to aid in generating regression tests via Cosole.WriteLine(...)
         private static readonly TextWriter Console = System.Console.Out;
-        private static readonly bool UpdateRegressionStatistics = Config.GetBool("regression-update-statistics", false);
+        private static readonly bool UpdateRegressionStatistics = Config.GetBool("regression-update-statistics", true);
 
         private AlgorithmNodePacket _job;
 
