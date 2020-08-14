@@ -64,125 +64,176 @@ namespace QuantConnect.ToolBox
             var targetApp = GetParameterOrExit(optionsObject, "app").ToLowerInvariant();
             if (targetApp.Contains("download") || targetApp.EndsWith("dl"))
             {
-                var fromDate = Parse.DateTimeExact(GetParameterOrExit(optionsObject, "from-date"), "yyyyMMdd-HH:mm:ss");
-                var resolution = optionsObject.ContainsKey("resolution") ? optionsObject["resolution"].ToString() : "";
+
                 var tickers = optionsObject.ContainsKey("tickers")
                     ? (optionsObject["tickers"] as Dictionary<string, object>)?.Keys.ToList()
                     : new List<string>();
+
+                var resolution = optionsObject.ContainsKey("resolution") ? optionsObject["resolution"].ToString() : "";
+                DateTime fromDate = new DateTime();
+                bool updateMode = false;
+                //Used to cache the lastUpdateDateTime
+                Dictionary<string, DateTime> lastUpdateDateTime = new Dictionary<string, DateTime>();
+                if (optionsObject.ContainsKey("from-date") && optionsObject["from-date"].ToString() == "update")
+                {
+                    updateMode = true;
+
+                    foreach (var ticker in tickers)
+                    {
+                        var dataDirectory = Config.Get("data-directory", "../../../Data");
+                        var reader = new LeanDataReader(LeanData.GenerateZipFilePath(dataDirectory, Symbol.Create(ticker, SecurityType.Equity, Market.USA), DateTime.Now, (Resolution)Enum.Parse(typeof(Resolution), resolution), TickType.Trade));
+                        if (reader.Parse().Count() == 0)
+                        {
+                            Console.WriteLine("Could not find data for " + ticker + " setting to 5 years history");
+                            lastUpdateDateTime.Add(ticker, DateTime.Now.AddYears(-5));
+                        }
+                        else
+                            lastUpdateDateTime.Add(ticker, reader.Parse().Last().EndTime);
+                    }
+                }
+                else
+                {
+                    fromDate = Parse.DateTimeExact(GetParameterOrExit(optionsObject, "from-date"), "yyyyMMdd-HH:mm:ss");
+                }
+
                 var toDate = optionsObject.ContainsKey("to-date")
                     ? Parse.DateTimeExact(optionsObject["to-date"].ToString(), "yyyyMMdd-HH:mm:ss")
                     : DateTime.UtcNow;
-                switch (targetApp)
+
+                var fullList = tickers.ToList();
+
+                for (var i = 0; updateMode == false || i < lastUpdateDateTime.Count(); i++)
                 {
-                    case "gdaxdl":
-                    case "gdaxdownloader":
-                        GDAXDownloaderProgram.GDAXDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "cdl":
-                    case "cryptoiqdownloader":
-                        CryptoiqDownloaderProgram.CryptoiqDownloader(tickers, GetParameterOrExit(optionsObject, "exchange"), fromDate, toDate);
-                        break;
-                    case "ddl":
-                    case "dukascopydownloader":
-                        DukascopyDownloaderProgram.DukascopyDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "fdl":
-                    case "fxcmdownloader":
-                        FxcmDownloaderProgram.FxcmDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "fvdl":
-                    case "fxcmvolumedownload":
-                        FxcmVolumeDownloadProgram.FxcmVolumeDownload(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "ibdl":
-                    case "ibdownloader":
-                        IBDownloaderProgram.IBDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "iexdl":
-                    case "iexdownloader":
-                        IEXDownloaderProgram.IEXDownloader(tickers, resolution, fromDate, toDate, GetParameterOrExit(optionsObject, "api-key"));
-                        break;
-                    case "iqfdl":
-                    case "iqfeeddownloader":
-                        IQFeedDownloaderProgram.IQFeedDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "kdl":
-                    case "krakendownloader":
-                        KrakenDownloaderProgram.KrakenDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "odl":
-                    case "oandadownloader":
-                        OandaDownloaderProgram.OandaDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "qbdl":
-                    case "quandlbitfinexdownloader":
-                        QuandlBitfinexDownloaderProgram.QuandlBitfinexDownloader(fromDate, GetParameterOrExit(optionsObject, "api-key"));
-                        break;
-                    case "ydl":
-                    case "yahoodownloader":
-                        YahooDownloaderProgram.YahooDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "bfxdl":
-                    case "bitfinexdownloader":
-                        BitfinexDownloaderProgram.BitfinexDownloader(tickers, resolution, fromDate, toDate);
-                        break;
-                    case "secdl":
-                    case "secdownloader":
-                        SECDataDownloaderProgram.SECDataDownloader(
-                            GetParameterOrExit(optionsObject, "destination-dir"),
-                            fromDate,
-                            toDate
-                        );
-                        break;
-                    case "ecdl":
-                    case "estimizeconsensusdownloader":
-                        EstimizeConsensusDataDownloaderProgram.EstimizeConsensusDataDownloader();
-                        break;
-                    case "eedl":
-                    case "estimizeestimatedownloader":
-                        EstimizeEstimateDataDownloaderProgram.EstimizeEstimateDataDownloader();
-                        break;
-                    case "erdl":
-                    case "estimizereleasedownloader":
-                        EstimizeReleaseDataDownloaderProgram.EstimizeReleaseDataDownloader();
-                        break;
+                    if (lastUpdateDateTime.Count() > 0)
+                    {
+                        tickers = new List<string>() { fullList[i] };
+                        fromDate = lastUpdateDateTime[fullList[i]];
+                    }
 
-                    case "psdl":
-                    case "psychsignaldownloader":
-                        PsychSignalDataConverterProgram.PsychSignalDataDownloader(
-                            fromDate,
-                            toDate,
-                            GetParameterOrDefault(optionsObject, "destination-dir", Path.Combine(Globals.DataFolder, "alternative", "psychsignal", "raw-psychsignal")),
-                            GetParameterOrExit(optionsObject, "api-key"),
-                            GetParameterOrDefault(optionsObject, "data-source", "twitter_enhanced_withretweets,stocktwits"));
-                        break;
-                    case "ustycdl":
-                    case "ustreasuryyieldcurvedownloader":
-                        USTreasuryYieldCurveProgram.USTreasuryYieldCurveRateDownloader(
-                            fromDate,
-                            toDate,
-                            GetParameterOrExit(optionsObject, "destination-dir")
-                        );
-                        break;
+                    //Console.WriteLine("Getting ticker " + fullList[i] + " from " + fromDate.ToIso8601Invariant() + " to " + toDate.ToIso8601Invariant());
 
-                    case "bzndl":
-                    case "benzinganewsdownloader":
-                        BenzingaProgram.BenzingaNewsDataDownloader(
-                            fromDate,
-                            toDate,
-                            GetParameterOrExit(optionsObject, "destination-dir"),
-                            GetParameterOrExit(optionsObject, "api-key")
-                        );
-                        break;
 
-                    case "tecdl":
-                    case "tradingeconomicscalendardownloader":
-                        TradingEconomicsDataDownloader.TradingEconomicsCalendarDownloaderProgram.TradingEconomicsCalendarDownloader();
-                        break;
+                    switch (targetApp)
+                    {
+                        case "gdaxdl":
+                        case "gdaxdownloader":
+                            GDAXDownloaderProgram.GDAXDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "cdl":
+                        case "cryptoiqdownloader":
+                            CryptoiqDownloaderProgram.CryptoiqDownloader(tickers, GetParameterOrExit(optionsObject, "exchange"), fromDate, toDate);
+                            break;
+                        case "ddl":
+                        case "dukascopydownloader":
+                            DukascopyDownloaderProgram.DukascopyDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "fdl":
+                        case "fxcmdownloader":
+                            FxcmDownloaderProgram.FxcmDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "fvdl":
+                        case "fxcmvolumedownload":
+                            FxcmVolumeDownloadProgram.FxcmVolumeDownload(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "ibdl":
+                        case "ibdownloader":
+                            IBDownloaderProgram.IBDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "iexdl":
+                        case "iexdownloader":
+                            IEXDownloaderProgram.IEXDownloader(tickers, resolution, fromDate, toDate, GetParameterOrExit(optionsObject, "api-key"));
+                            break;
+                        case "iqfdl":
+                        case "iqfeeddownloader":
+                            IQFeedDownloaderProgram.IQFeedDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "kdl":
+                        case "krakendownloader":
+                            KrakenDownloaderProgram.KrakenDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "odl":
+                        case "oandadownloader":
+                            OandaDownloaderProgram.OandaDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "qbdl":
+                        case "quandlbitfinexdownloader":
+                            QuandlBitfinexDownloaderProgram.QuandlBitfinexDownloader(fromDate, GetParameterOrExit(optionsObject, "api-key"));
+                            break;
+                        case "ydl":
+                        case "yahoodownloader":
+                            YahooDownloaderProgram.YahooDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "bfxdl":
+                        case "bitfinexdownloader":
+                            BitfinexDownloaderProgram.BitfinexDownloader(tickers, resolution, fromDate, toDate);
+                            break;
+                        case "secdl":
+                        case "secdownloader":
+                            SECDataDownloaderProgram.SECDataDownloader(
+                                GetParameterOrExit(optionsObject, "destination-dir"),
+                                fromDate,
+                                toDate
+                            );
+                            break;
+                        case "ecdl":
+                        case "estimizeconsensusdownloader":
+                            EstimizeConsensusDataDownloaderProgram.EstimizeConsensusDataDownloader();
+                            break;
+                        case "eedl":
+                        case "estimizeestimatedownloader":
+                            EstimizeEstimateDataDownloaderProgram.EstimizeEstimateDataDownloader();
+                            break;
+                        case "erdl":
+                        case "estimizereleasedownloader":
+                            EstimizeReleaseDataDownloaderProgram.EstimizeReleaseDataDownloader();
+                            break;
 
-                    default:
-                        PrintMessageAndExit(1, "ERROR: Unrecognized --app value");
+                        case "psdl":
+                        case "psychsignaldownloader":
+                            PsychSignalDataConverterProgram.PsychSignalDataDownloader(
+                                fromDate,
+                                toDate,
+                                GetParameterOrDefault(optionsObject, "destination-dir", Path.Combine(Globals.DataFolder, "alternative", "psychsignal", "raw-psychsignal")),
+                                GetParameterOrExit(optionsObject, "api-key"),
+                                GetParameterOrDefault(optionsObject, "data-source", "twitter_enhanced_withretweets,stocktwits"));
+                            break;
+                        case "ustycdl":
+                        case "ustreasuryyieldcurvedownloader":
+                            USTreasuryYieldCurveProgram.USTreasuryYieldCurveRateDownloader(
+                                fromDate,
+                                toDate,
+                                GetParameterOrExit(optionsObject, "destination-dir")
+                            );
+                            break;
+
+                        case "bzndl":
+                        case "benzinganewsdownloader":
+                            BenzingaProgram.BenzingaNewsDataDownloader(
+                                fromDate,
+                                toDate,
+                                GetParameterOrExit(optionsObject, "destination-dir"),
+                                GetParameterOrExit(optionsObject, "api-key")
+                            );
+                            break;
+
+                        case "tecdl":
+                        case "tradingeconomicscalendardownloader":
+                            TradingEconomicsDataDownloader.TradingEconomicsCalendarDownloaderProgram.TradingEconomicsCalendarDownloader();
+                            break;
+
+                        default:
+                            PrintMessageAndExit(1, "ERROR: Unrecognized --app value");
+                            break;
+                    }
+
+                    if (!updateMode)
+                    {
                         break;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Got ticker " + fullList[i] + " " + i + "/" + fullList.Count() + " " + Math.Round(((double)i/(double)fullList.Count()), 2) + "%");
+                    }
                 }
             }
             else
@@ -299,6 +350,8 @@ namespace QuantConnect.ToolBox
                         break;
                 }
             }
+
+            Console.WriteLine("TEST");
         }
 
         private static void PrintMessageAndExit(int exitCode = 0, string message = "")

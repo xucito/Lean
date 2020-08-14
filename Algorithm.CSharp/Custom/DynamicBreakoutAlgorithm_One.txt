@@ -1,0 +1,189 @@
+﻿using System;
+using System.Linq;
+using QuantConnect.Indicators;
+using MathNet.Numerics.Statistics;
+using QuantConnect.Algorithm;
+using QuantConnect.Data;
+using System.Collections.Generic;
+using QuantConnect.Data.Market;
+using QuantConnect.Algorithm.Framework.Selection;
+using QuantConnect.Algorithm.Framework.Portfolio;
+using QuantConnect.Algorithm.Framework.Risk;
+using QuantConnect.Algorithm.Framework.Execution;
+using QuantConnect.Algorithm.Framework.Alphas;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Orders;
+using QuantConnect.Algorithm.CSharp.Custom;
+
+namespace QuantConnect
+{
+    // https://www.quantconnect.com/tutorials/dynamic-breakout-ii-strategy/
+    public class DynamicBreakoutAlgorithm : QCAlgorithm
+    {
+        public override void Initialize()
+        {
+            SetStartDate(2016, 10, 1);
+            SetEndDate(2020, 12, 1);
+            SetCash(100000);
+
+            var symbols = SymbolList.Symbols;
+
+            UniverseSettings.Resolution = Resolution.Daily;
+            SetUniverseSelection(new ManualUniverseSelectionModel(symbols));
+            SetAlpha(new MOMAlphaModel());
+            SetPortfolioConstruction(new EqualWeightingPortfolioConstructionModel());
+            SetRiskManagement(new MaximumDrawdownPercentPerSecurity(0.02m));
+
+            AddUniverse(coarse =>
+            {
+                // Properties available on the CoarseFundamental type 'stock'
+                // stock.DollarVollume
+                // stock.Value (daily close)
+                // stock.Volume
+                // stock.Market
+                //
+                return (from c in coarse
+                       orderby c.Value descending
+                       select c.Symbol).Take(500);
+            });
+            SetBenchmark("SPY");
+
+            //1. Set the Execution handler to a new instance of ImmediateExecutionModel()
+            SetExecution(new MyExecutionModel());
+        }
+    }
+
+    // Basic Execution Model Scaffolding Structure Example
+    public class MyExecutionModel : ExecutionModel
+    {
+        private readonly PortfolioTargetCollection _targetsCollection = new PortfolioTargetCollection();
+
+        // Fill the supplied portfolio targets efficiently.
+        public override void Execute(QCAlgorithm algorithm, IPortfolioTarget[] targets)
+        {
+            _targetsCollection.AddRange(targets);
+            // for performance we check count value, OrderByMarginImpact and ClearFulfilled are expensive to call
+            if (_targetsCollection.Count > 0)
+            {
+                foreach (var target in _targetsCollection.OrderByMarginImpact(algorithm))
+                {
+                    // calculate remaining quantity to be ordered
+                    var quantity = CalculateBalancedQuantity(algorithm, target.Symbol, OrderSizing.GetUnorderedQuantity(algorithm, target));
+                    if (quantity > 0)
+                    {
+                        algorithm.MarketOrder(target.Symbol, quantity);
+                    }
+                }
+
+                _targetsCollection.ClearFulfilled(algorithm);
+            }
+
+            foreach(var sec in algorithm.Portfolio.Securities)
+            {
+                if (sec.Value.Symbol.SecurityType == SecurityType.Equity && sec.Value.Holdings.Quantity > 0)
+                {
+                    if ((sec.Value.Holdings.HoldingsValue - sec.Value.Holdings.AbsoluteHoldingsCost) / sec.Value.Holdings.AbsoluteHoldingsCost < -0.1m)
+                    {
+                        Console.WriteLine("Triggered stop-loss for " + sec.Key.ID.Symbol);
+                        algorithm.MarketOrder(sec.Key, -1 * sec.Value.Holdings.Quantity);
+                    }
+                    else if((sec.Value.Holdings.HoldingsValue - sec.Value.Holdings.AbsoluteHoldingsCost) / sec.Value.Holdings.AbsoluteHoldingsCost >= 0.2m)
+                    {
+                        Console.WriteLine("Triggered sell for " + sec.Key.ID.Symbol);
+                        algorithm.MarketOrder(sec.Key, -1 * sec.Value.Holdings.Quantity);
+                    }
+                }
+            }
+        }
+
+        private decimal CalculateBalancedQuantity(QCAlgorithm algorithm, Symbol symbol, decimal quantity)
+        {
+
+            var totalValue = algorithm.Portfolio.TotalPortfolioValue;
+            if (algorithm.ActiveSecurities.ContainsKey(symbol))
+            {
+                /*if(algorithm.Portfolio[symbol].Invested)
+                {
+                    return 0;
+                }*/
+
+                var totalTransactionValue = (quantity * algorithm.ActiveSecurities[symbol].Open) - algorithm.Portfolio[symbol].HoldingsValue;
+
+                var totalNumberOfAssets = 0;
+                if (totalValue < 100000)
+                {
+                    totalNumberOfAssets = 2;
+                }
+                else if (totalValue < 200000)
+                {
+                    totalNumberOfAssets = 3;
+                }
+                else if (totalValue < 250000)
+                {
+                    totalNumberOfAssets = 4;
+                }
+                else
+                {
+                    totalNumberOfAssets = 5;
+                }
+
+
+                //If total number of assets == 0
+                var existingAssetCount = algorithm.Portfolio.Count();
+
+                if (existingAssetCount == totalNumberOfAssets)
+                {
+                    return 0;
+                }
+
+                var valueToBuy = totalTransactionValue < (totalValue / totalNumberOfAssets) ? totalTransactionValue : (totalValue / totalNumberOfAssets);
+
+                valueToBuy = valueToBuy < algorithm.Portfolio.Cash ? valueToBuy : algorithm.Portfolio.Cash;
+
+                return Math.Floor((valueToBuy / algorithm.ActiveSecurities[symbol].Open));
+            }
+            return 0;
+        }
+
+        //  Optional: Securities changes event for handling new securities.
+        public override void OnSecuritiesChanged(QCAlgorithm algorithm,
+                                                 SecurityChanges changes)
+        {
+
+        }
+    }
+
+    public class MOMAlphaModel : AlphaModel
+    {
+        //Dictionary<Symbol, Momentum> mom = new Dictionary<Symbol, Momentum>();
+        int numberOfWeightedDays = 14;
+        Dictionary<int, Dictionary<Symbol, Momentum>> weightedMom = new Dictionary<int, Dictionary<Symbol, Momentum>>();
+
+        public MOMAlphaModel()
+        {
+            for (var i = 1; i <= numberOfWeightedDays; i++)
+            {
+                weightedMom.Add(i, new Dictionary<Symbol, Momentum>());
+            }
+        }
+
+        public override void OnSecuritiesChanged(QCAlgorithm algorithm, SecurityChanges changes)
+        {
+            foreach (var security in changes.AddedSecurities)
+            {
+                var symbol = security.Symbol;
+                if (!mom.ContainsKey(symbol))
+                    mom.Add(symbol, algorithm.MOM(symbol, 14, Resolution.Daily));
+            }
+        }
+
+        public override IEnumerable<Insight> Update(QCAlgorithm algorithm, Slice data)
+        {
+            var ordered = mom.OrderByDescending(kvp => kvp.Value);
+
+            return Insight.Group(
+                Insight.Price(ordered.First().Key, TimeSpan.FromDays(1), InsightDirection.Up)
+            );
+        }
+    }
+}

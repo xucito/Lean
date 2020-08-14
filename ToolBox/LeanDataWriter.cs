@@ -141,7 +141,16 @@ namespace QuantConnect.ToolBox
             var outputFile = GetZipOutputFileName(_dataDirectory, lastTime);
 
             // Load new data rows into a SortedDictionary for easy merge/update
-            var newRows = new SortedDictionary<DateTime, string>(source.ToDictionary(x => x.Time, x => LeanData.GenerateLine(x, _securityType, _resolution)));
+            var newRows = new SortedDictionary<DateTime, string>();
+
+            foreach (var p in source)
+            {
+                if (!newRows.ContainsKey(p.Time))
+                    newRows.Add(p.Time, LeanData.GenerateLine(p, _securityType, _resolution));
+                else
+                    Console.WriteLine("Point " + p.Time + " is duplicate.");
+            }
+
             SortedDictionary<DateTime, string> rows;
 
             if (File.Exists(outputFile))

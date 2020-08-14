@@ -160,6 +160,10 @@
     <Compile Include="AltData\TradingEconomicsAlgorithm.cs" />
     <Compile Include="AltData\TiingoNewsAlgorithm.cs" />
     <Compile Include="BasicTemplateConstituentUniverseAlgorithm.cs" />
+    <Content Include="Custom\DynamicBreakoutAlgorithm_One.txt" />
+    <Compile Include="Custom\CryptoAlgorithm.cs" />
+    <Compile Include="Custom\DynamicBreakoutAlgorithm .cs" />
+    <Compile Include="Custom\SymbolList.cs" />
     <Compile Include="DefaultResolutionRegressionAlgorithm.cs" />
     <Compile Include="BasicPythonIntegrationTemplateAlgorithm.cs" />
     <Compile Include="BasicSetAccountCurrencyAlgorithm.cs" />

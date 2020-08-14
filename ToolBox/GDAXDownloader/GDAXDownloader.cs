@@ -88,7 +88,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
             {
                 try
                 {
-                    Thread.Sleep(1000 / MaxRequestsPerSecond + 1);
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                     var response = (HttpWebResponse)request.GetResponse();
                     var encoding = Encoding.ASCII;
 

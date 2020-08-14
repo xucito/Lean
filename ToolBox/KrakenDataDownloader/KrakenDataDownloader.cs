@@ -21,6 +21,7 @@ using System.Net;
 using Newtonsoft.Json;
 using QuantConnect.Data.Market;
 using QuantConnect.Util;
+using System.Dynamic;
 
 namespace QuantConnect.ToolBox.KrakenDownloader
 {
@@ -41,6 +42,7 @@ namespace QuantConnect.ToolBox.KrakenDownloader
         /// <returns>Enumerable of base data for this symbol</returns>
         public IEnumerable<BaseData> Get(Symbol symbol, Resolution resolution, DateTime startUtc, DateTime endUtc)
         {
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (endUtc < startUtc)
             {
                 throw new ArgumentException("The end date must be greater or equal than the start date.");

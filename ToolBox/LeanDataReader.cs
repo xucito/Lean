@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using Ionic.Zip;
 using NodaTime;
+using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Securities;
 using QuantConnect.Util;
@@ -34,7 +35,7 @@ namespace QuantConnect.ToolBox
         private readonly string _zipPath;
         private readonly string _zipentry;
         private readonly SubscriptionDataConfig _config;
-        
+
         /// <summary>
         /// The LeanDataReader constructor
         /// </summary>
@@ -46,7 +47,7 @@ namespace QuantConnect.ToolBox
         public LeanDataReader(SubscriptionDataConfig config, Symbol symbol, Resolution resolution, DateTime date, string dataFolder)
         {
             _date = date;
-            _zipPath = LeanData.GenerateZipFilePath(dataFolder, symbol, date,  resolution, config.TickType);
+            _zipPath = LeanData.GenerateZipFilePath(dataFolder, symbol, date, resolution, config.TickType);
             _zipentry = LeanData.GenerateZipEntryName(symbol, date, resolution, config.TickType);
             _config = config;
         }
@@ -74,7 +75,7 @@ namespace QuantConnect.ToolBox
                 zipEntry = filepath.Split('#')[1];
                 filepath = filepath.Split('#')[0];
             }
-            
+
             var fileInfo = new FileInfo(filepath);
             if (!LeanData.TryParsePath(fileInfo.FullName, out symbol, out date, out resolution))
             {
@@ -114,9 +115,9 @@ namespace QuantConnect.ToolBox
         /// <returns>IEnumerable of ticks</returns>
         public IEnumerable<BaseData> Parse()
         {
-            var factory = (BaseData) ObjectActivator.GetActivator(_config.Type).Invoke(new object[0]);
+            var factory = (BaseData)ObjectActivator.GetActivator(_config.Type).Invoke(new object[0]);
             ZipFile zipFile;
-            using (var unzipped = Compression.Unzip(_zipPath,_zipentry, out zipFile))
+            using (var unzipped = Compression.Unzip(_zipPath, _zipentry, out zipFile))
             {
                 if (unzipped == null)
                     yield break;
